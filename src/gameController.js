@@ -44,6 +44,11 @@ export default function createGame() {
 
   placeShips();
 
+  function randomizePlayerShips() {
+    player.gameboard.resetBoard();
+    placeShipsRandomly(player.gameboard);
+  }
+
   function getCurrentPlayer() {
     return currentPlayer;
   }
@@ -83,5 +88,6 @@ export default function createGame() {
     playTurn,
     getCurrentPlayer,
     isGameOver,
+    randomizePlayerShips,
   };
 }

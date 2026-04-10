@@ -69,4 +69,14 @@ export default class Gameboard {
   allShipsSunk() {
     return this.ships.every((ship) => ship.isSunk());
   }
+
+  resetBoard() {
+  this.ships = [];
+  this.missedAttacks = [];
+  this.hits = [];
+  this.attackedCoordinates.clear();
+  this.board = Array.from({ length: this.size }, () =>
+    Array(this.size).fill(null)
+  );
+}
 }

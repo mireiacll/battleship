@@ -1,10 +1,12 @@
 import createGame from './gameController.js';
 import { renderBoard, updateStatus } from './dom.js';
 
-const game = createGame();
+let game = createGame();
 
 const playerBoardDiv = document.getElementById('player-board');
 const computerBoardDiv = document.getElementById('computer-board');
+const randomizeBtn = document.getElementById('randomize-btn');
+const restartBtn = document.getElementById('restart-btn');
 
 function render() {
   renderBoard(game.player.gameboard, playerBoardDiv, true);
@@ -40,13 +42,37 @@ function handleComputerTurn() {
 
   if (game.isGameOver()) {
     updateStatus('💻 Computer wins!');
+    computerBoardDiv.removeEventListener('click', handlePlayerTurn);
     return;
   }
 
   updateStatus('Your turn!');
 }
 
+// Event listener for attacking the computer board
 computerBoardDiv.addEventListener('click', handlePlayerTurn);
 
+// Randomize Player Ships
+if (randomizeBtn) {
+  randomizeBtn.addEventListener('click', () => {
+    game.randomizePlayerShips();
+    render();
+    updateStatus('🔄 Player ships randomized!');
+  });
+}
+
+// 🔄 Restart the Game
+if (restartBtn) {
+  restartBtn.addEventListener('click', () => {
+    game = createGame();
+    render();
+    updateStatus('New game started! Your turn.');
+
+    // Reattach event listener after restart
+    computerBoardDiv.addEventListener('click', handlePlayerTurn);
+  });
+}
+
+// Initial render
 render();
 updateStatus('Your turn! Attack the enemy board.');
