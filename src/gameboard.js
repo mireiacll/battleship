@@ -3,6 +3,7 @@ export default class Gameboard {
     this.size = 10;
     this.ships = [];
     this.missedAttacks = [];
+    this.hits = []; // Track successful hit coordinates
     this.board = Array.from({ length: this.size }, () =>
       Array(this.size).fill(null)
     );
@@ -57,6 +58,7 @@ export default class Gameboard {
 
     if (target) {
       target.hit();
+      this.hits.push([x, y]); // Record exact hit location
       return 'hit';
     } else {
       this.missedAttacks.push([x, y]);
