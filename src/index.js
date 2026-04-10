@@ -1,12 +1,13 @@
 import createGame from './gameController.js';
 import { renderBoard, updateStatus } from './dom.js';
 
-let game = createGame();
-let selectedShip = null; // the shipyard <div> element currently selected
+let game = null;
+let gameMode = null; // 'vsComputer' or 'vsPlayer'
+let selectedShip = null;
 let direction = 'horizontal';
 let gameStarted = false;
+let currentSetupPlayer = 1; // Which player is currently placing ships (1 or 2)
 
-// Map<shipElement -> { x, y, dir, length }>
 const shipPlacements = new Map();
 const totalShips = 5;
 
@@ -20,31 +21,117 @@ const randomizeBtn = document.getElementById('randomize-btn');
 const resetBtn     = document.getElementById('reset-btn');
 const newGameBtn   = document.getElementById('new-game-btn');
 
+// Mode selection elements
+const modeSelection = document.getElementById('mode-selection');
+const vsComputerBtn = document.getElementById('vs-computer-btn');
+const vsPlayerBtn   = document.getElementById('vs-player-btn');
+
+// Pass device overlay
+const passDeviceOverlay = document.getElementById('pass-device-overlay');
+const passDeviceText    = document.getElementById('pass-device-text');
+let continueBtn       = document.getElementById('continue-btn');
+
+// ── Mode Selection ────────────────────────────────────────────────────────────
+vsComputerBtn.addEventListener('click', () => {
+  gameMode = 'vsComputer';
+  startGame();
+});
+
+vsPlayerBtn.addEventListener('click', () => {
+  gameMode = 'vsPlayer';
+  startGame();
+});
+
+function startGame() {
+  game = createGame(gameMode);
+  modeSelection.style.display = 'none';
+  document.querySelector('.controls').style.display = 'block';
+  document.querySelector('#shipyard').style.display = 'block';
+  document.querySelector('.game-container').style.display = 'flex';
+  document.querySelector('#status').style.display = 'block';
+  
+  if (gameMode === 'vsPlayer') {
+    updateBoardLabels('Player 1', 'Player 2');
+    updateStatus('Player 1: Drag ships onto your board, or click "Randomize Ships".');
+  } else {
+    updateBoardLabels('Player', 'Computer');
+    updateStatus('Drag ships onto your board, or click "Randomize Ships".');
+  }
+  
+  render();
+}
+
+function updateBoardLabels(player1Label, player2Label) {
+  document.querySelector('.board-container:nth-child(1) h2').textContent = `${player1Label} Board`;
+  document.querySelector('.board-container:nth-child(2) h2').textContent = `${player2Label} Board`;
+}
+
+// ── Pass Device Screen ────────────────────────────────────────────────────────
+function showPassDevice(playerName, callback) {
+  passDeviceText.textContent = `Pass device to ${playerName}`;
+  passDeviceOverlay.style.display = 'flex';
+  
+  // Remove old listeners and add new one
+  const newBtn = continueBtn.cloneNode(true);
+  continueBtn.parentNode.replaceChild(newBtn, continueBtn);
+  continueBtn = document.getElementById('continue-btn');
+  
+  continueBtn.addEventListener('click', () => {
+    passDeviceOverlay.style.display = 'none';
+    if (callback) callback();
+  }, { once: true });
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
-  renderBoard(game.player.gameboard, playerBoardDiv, true);
-  renderBoard(game.computer.gameboard, computerBoardDiv, false);
+  if (gameMode === 'vsComputer') {
+    renderBoard(game.player1.gameboard, playerBoardDiv, true);
+    renderBoard(game.player2.gameboard, computerBoardDiv, false);
+  } else if (gameMode === 'vsPlayer') {
+    if (!gameStarted) {
+      // During setup, show ships for the player currently placing
+      if (currentSetupPlayer === 1) {
+        renderBoard(game.player1.gameboard, playerBoardDiv, true);
+        renderBoard(game.player2.gameboard, computerBoardDiv, false);
+      } else {
+        renderBoard(game.player1.gameboard, playerBoardDiv, false);
+        renderBoard(game.player2.gameboard, computerBoardDiv, true);
+      }
+    } else {
+      // During gameplay, show ships only for current player
+      const currentPlayer = game.getCurrentPlayer();
+      if (currentPlayer === game.player1) {
+        renderBoard(game.player1.gameboard, playerBoardDiv, true);
+        renderBoard(game.player2.gameboard, computerBoardDiv, false);
+      } else {
+        renderBoard(game.player1.gameboard, playerBoardDiv, false);
+        renderBoard(game.player2.gameboard, computerBoardDiv, true);
+      }
+    }
+  }
 
-  // Make placed ship cells draggable so they can be moved directly
   if (!gameStarted) {
-    playerBoardDiv.querySelectorAll('.cell.has-ship').forEach(cell => {
+    const targetBoard = currentSetupPlayer === 1 ? playerBoardDiv : computerBoardDiv;
+    targetBoard.querySelectorAll('.cell.has-ship').forEach(cell => {
       cell.setAttribute('draggable', 'true');
     });
   }
 }
 
 function rebuildPlayerBoard() {
-  game.player.gameboard.resetBoard();
+  const player = currentSetupPlayer === 1 ? game.player1 : game.player2;
+  player.gameboard.resetBoard();
   shipPlacements.forEach(({ x, y, dir, length, randomized }) => {
-    if (!randomized) game.placePlayerShip(length, [x, y], dir);
+    if (!randomized) game.placePlayerShip(length, [x, y], dir, currentSetupPlayer);
   });
 }
 
 function updatePlacementStatus() {
   const n = shipPlacements.size;
+  const playerName = gameMode === 'vsPlayer' ? `Player ${currentSetupPlayer}` : 'You';
   updateStatus(n === totalShips
-    ? 'All ships placed! Click "Start Game".'
-    : `Place your ships. (${n}/${totalShips})`);
+    ? `All ships placed! Click "Start Game".`
+    : `${playerName}: Place your ships. (${n}/${totalShips})`);
 }
 
 // ── Board selection highlight ─────────────────────────────────────────────────
@@ -52,21 +139,23 @@ function clearBoardSelection() {
   playerBoardDiv.querySelectorAll('.board-selected').forEach(c =>
     c.classList.remove('board-selected')
   );
+  computerBoardDiv.querySelectorAll('.board-selected').forEach(c =>
+    c.classList.remove('board-selected')
+  );
 }
 
-function highlightShipCells(placement) {
+function highlightShipCells(placement, boardDiv) {
   clearBoardSelection();
   if (!placement || placement.randomized) return;
   const { x, y, dir, length } = placement;
   for (let i = 0; i < length; i++) {
     const nx = dir === 'vertical'   ? x + i : x;
     const ny = dir === 'horizontal' ? y + i : y;
-    const cell = playerBoardDiv.querySelector(`[data-x="${nx}"][data-y="${ny}"]`);
+    const cell = boardDiv.querySelector(`[data-x="${nx}"][data-y="${ny}"]`);
     if (cell) cell.classList.add('board-selected');
   }
 }
 
-// ── Find which ship element owns a board cell ─────────────────────────────────
 function findShipAtCell(x, y) {
   for (const [shipEl, placement] of shipPlacements) {
     if (placement.randomized) continue;
@@ -78,6 +167,11 @@ function findShipAtCell(x, y) {
     }
   }
   return null;
+}
+
+// ── Get active board for current setup player ─────────────────────────────────
+function getActiveBoard() {
+  return currentSetupPlayer === 1 ? playerBoardDiv : computerBoardDiv;
 }
 
 // ── Shipyard ship drag & click ────────────────────────────────────────────────
@@ -102,58 +196,141 @@ allShipEls.forEach((ship) => {
   ship.addEventListener('dragend', () => ship.classList.remove('dragging'));
 });
 
-// ── Click a ship cell on the board → select it (stays on board) ───────────────
-playerBoardDiv.addEventListener('click', (e) => {
-  if (gameStarted) return;
-  const cell = e.target.closest('.cell');
-  if (!cell) return;
+// ── Board interaction (both boards for 2-player setup) ────────────────────────
+function setupBoardInteraction(boardDiv) {
+  boardDiv.addEventListener('click', (e) => {
+    if (gameStarted) return;
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
 
-  if (!cell.classList.contains('has-ship')) {
-    // Clicked empty water → deselect
-    clearBoardSelection();
+    if (!cell.classList.contains('has-ship')) {
+      clearBoardSelection();
+      allShipEls.forEach(s => s.classList.remove('selected'));
+      if (selectedShip && shipPlacements.has(selectedShip)) selectedShip = null;
+      updatePlacementStatus();
+      return;
+    }
+
+    const x = Number(cell.dataset.x);
+    const y = Number(cell.dataset.y);
+    const shipEl = findShipAtCell(x, y);
+    if (!shipEl) return;
+
     allShipEls.forEach(s => s.classList.remove('selected'));
-    if (selectedShip && shipPlacements.has(selectedShip)) selectedShip = null;
-    updatePlacementStatus();
-    return;
-  }
+    selectedShip = shipEl;
+    const placement = shipPlacements.get(shipEl);
+    direction = placement.dir;
+    highlightShipCells(placement, boardDiv);
 
-  const x = Number(cell.dataset.x);
-  const y = Number(cell.dataset.y);
-  const shipEl = findShipAtCell(x, y);
-  if (!shipEl) return;
+    updateStatus('Ship selected — drag to move it, or click Rotate to rotate in place.');
+  });
 
-  // Select this ship (keep it on the board, just highlight)
-  allShipEls.forEach(s => s.classList.remove('selected'));
-  selectedShip = shipEl;
-  const placement = shipPlacements.get(shipEl);
-  direction = placement.dir;
-  highlightShipCells(placement);
+  boardDiv.addEventListener('dragstart', (e) => {
+    if (gameStarted) return;
+    const cell = e.target.closest('.cell.has-ship');
+    if (!cell) return;
 
-  updateStatus('Ship selected — drag to move it, or click Rotate to rotate in place.');
-});
+    const x = Number(cell.dataset.x);
+    const y = Number(cell.dataset.y);
+    const shipEl = findShipAtCell(x, y);
+    if (!shipEl) return;
 
-// ── Drag a ship directly from the board ───────────────────────────────────────
-playerBoardDiv.addEventListener('dragstart', (e) => {
-  if (gameStarted) return;
-  const cell = e.target.closest('.cell.has-ship');
-  if (!cell) return;
+    const placement = shipPlacements.get(shipEl);
+    selectedShip = shipEl;
+    direction = placement.dir;
+    highlightShipCells(placement, boardDiv);
+    e.dataTransfer.effectAllowed = 'move';
+  });
 
-  const x = Number(cell.dataset.x);
-  const y = Number(cell.dataset.y);
-  const shipEl = findShipAtCell(x, y);
-  if (!shipEl) return;
+  boardDiv.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!selectedShip || gameStarted) return;
 
-  const placement = shipPlacements.get(shipEl);
-  selectedShip = shipEl;
-  direction = placement.dir;
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    clearHighlights();
 
-  // Highlight which ship is being dragged
-  highlightShipCells(placement);
+    const x      = Number(cell.dataset.x);
+    const y      = Number(cell.dataset.y);
+    const length = Number(selectedShip.dataset.length);
 
-  e.dataTransfer.effectAllowed = 'move';
-  // Note: we do NOT rebuild the board here — we do it on drop
-  // so the drag image stays visible during the drag
-});
+    const positions = [];
+    for (let i = 0; i < length; i++) {
+      const nx = direction === 'vertical'   ? x + i : x;
+      const ny = direction === 'horizontal' ? y + i : y;
+      if (nx >= 10 || ny >= 10) return;
+      positions.push([nx, ny]);
+    }
+
+    const occupied = Array.from({ length: 10 }, () => Array(10).fill(false));
+    shipPlacements.forEach((p, shipEl) => {
+      if (shipEl === selectedShip || p.randomized) return;
+      const { x: px, y: py, dir, length: len } = p;
+      for (let i = 0; i < len; i++) {
+        const nx = dir === 'vertical'   ? px + i : px;
+        const ny = dir === 'horizontal' ? py + i : py;
+        occupied[nx][ny] = true;
+      }
+    });
+
+    const isValid = positions.every(([nx, ny]) => !occupied[nx][ny]);
+    positions.forEach(([nx, ny]) => {
+      const c = boardDiv.querySelector(`[data-x="${nx}"][data-y="${ny}"]`);
+      if (c) c.classList.add(isValid ? 'preview-valid' : 'preview-invalid');
+    });
+  });
+
+  boardDiv.addEventListener('dragleave', (e) => {
+    if (!boardDiv.contains(e.relatedTarget)) clearHighlights();
+  });
+
+  boardDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    clearHighlights();
+    clearBoardSelection();
+    if (!selectedShip || gameStarted) return;
+
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+
+    const x      = Number(cell.dataset.x);
+    const y      = Number(cell.dataset.y);
+    const length = Number(selectedShip.dataset.length);
+
+    const prevPlacement = shipPlacements.get(selectedShip);
+    shipPlacements.delete(selectedShip);
+    rebuildPlayerBoard();
+
+    try {
+      game.placePlayerShip(length, [x, y], direction, currentSetupPlayer);
+      shipPlacements.set(selectedShip, { x, y, dir: direction, length });
+
+      selectedShip.classList.add('placed');
+      selectedShip.classList.remove('selected');
+      selectedShip = null;
+
+      render();
+      updatePlacementStatus();
+    } catch {
+      if (prevPlacement) shipPlacements.set(selectedShip, prevPlacement);
+      rebuildPlayerBoard();
+      render();
+      updateStatus('Invalid placement — out of bounds or overlapping.');
+    }
+  });
+}
+
+setupBoardInteraction(playerBoardDiv);
+setupBoardInteraction(computerBoardDiv);
+
+function clearHighlights() {
+  playerBoardDiv.querySelectorAll('.preview-valid, .preview-invalid').forEach(c =>
+    c.classList.remove('preview-valid', 'preview-invalid')
+  );
+  computerBoardDiv.querySelectorAll('.preview-valid, .preview-invalid').forEach(c =>
+    c.classList.remove('preview-valid', 'preview-invalid')
+  );
+}
 
 // ── Rotate ────────────────────────────────────────────────────────────────────
 rotateBtn.addEventListener('click', () => {
@@ -163,9 +340,9 @@ rotateBtn.addEventListener('click', () => {
   }
 
   const placement = shipPlacements.get(selectedShip);
+  const activeBoard = getActiveBoard();
 
   if (placement && !placement.randomized) {
-    // Ship is on the board → rotate in place
     const newDir = placement.dir === 'horizontal' ? 'vertical' : 'horizontal';
     const { x, y, length } = placement;
 
@@ -173,117 +350,28 @@ rotateBtn.addEventListener('click', () => {
     rebuildPlayerBoard();
 
     try {
-      game.placePlayerShip(length, [x, y], newDir);
+      game.placePlayerShip(length, [x, y], newDir, currentSetupPlayer);
       shipPlacements.set(selectedShip, { x, y, dir: newDir, length });
       direction = newDir;
       render();
-      highlightShipCells({ x, y, dir: newDir, length });
+      highlightShipCells({ x, y, dir: newDir, length }, activeBoard);
       updateStatus('Rotated! Drag to move, or click another ship.');
     } catch {
-      // Not enough room — restore original
       shipPlacements.set(selectedShip, placement);
       rebuildPlayerBoard();
       render();
-      highlightShipCells(placement);
+      highlightShipCells(placement, activeBoard);
       updateStatus("Not enough space to rotate here — move the ship first.");
     }
   } else {
-    // Ship is in the shipyard (not yet placed)
     direction = direction === 'horizontal' ? 'vertical' : 'horizontal';
     selectedShip.classList.toggle('vertical');
   }
 });
 
-// ── Drag-over preview ─────────────────────────────────────────────────────────
-function clearHighlights() {
-  playerBoardDiv.querySelectorAll('.preview-valid, .preview-invalid').forEach(c =>
-    c.classList.remove('preview-valid', 'preview-invalid')
-  );
-}
-
-playerBoardDiv.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  if (!selectedShip || gameStarted) return;
-
-  const cell = e.target.closest('.cell');
-  if (!cell) return;
-  clearHighlights();
-
-  const x      = Number(cell.dataset.x);
-  const y      = Number(cell.dataset.y);
-  const length = Number(selectedShip.dataset.length);
-
-  const positions = [];
-  for (let i = 0; i < length; i++) {
-    const nx = direction === 'vertical'   ? x + i : x;
-    const ny = direction === 'horizontal' ? y + i : y;
-    if (nx >= 10 || ny >= 10) return;
-    positions.push([nx, ny]);
-  }
-
-  // Occupancy excluding the ship being moved
-  const occupied = Array.from({ length: 10 }, () => Array(10).fill(false));
-  shipPlacements.forEach((p, shipEl) => {
-    if (shipEl === selectedShip || p.randomized) return;
-    const { x: px, y: py, dir, length: len } = p;
-    for (let i = 0; i < len; i++) {
-      const nx = dir === 'vertical'   ? px + i : px;
-      const ny = dir === 'horizontal' ? py + i : py;
-      occupied[nx][ny] = true;
-    }
-  });
-
-  const isValid = positions.every(([nx, ny]) => !occupied[nx][ny]);
-  positions.forEach(([nx, ny]) => {
-    const c = playerBoardDiv.querySelector(`[data-x="${nx}"][data-y="${ny}"]`);
-    if (c) c.classList.add(isValid ? 'preview-valid' : 'preview-invalid');
-  });
-});
-
-playerBoardDiv.addEventListener('dragleave', (e) => {
-  if (!playerBoardDiv.contains(e.relatedTarget)) clearHighlights();
-});
-
-// ── Drop ──────────────────────────────────────────────────────────────────────
-playerBoardDiv.addEventListener('drop', (e) => {
-  e.preventDefault();
-  clearHighlights();
-  clearBoardSelection();
-  if (!selectedShip || gameStarted) return;
-
-  const cell = e.target.closest('.cell');
-  if (!cell) return;
-
-  const x      = Number(cell.dataset.x);
-  const y      = Number(cell.dataset.y);
-  const length = Number(selectedShip.dataset.length);
-
-  const prevPlacement = shipPlacements.get(selectedShip);
-  shipPlacements.delete(selectedShip);
-  rebuildPlayerBoard();
-
-  try {
-    game.placePlayerShip(length, [x, y], direction);
-    shipPlacements.set(selectedShip, { x, y, dir: direction, length });
-
-    // Hide from shipyard (in case it came from there)
-    selectedShip.classList.add('placed');
-    selectedShip.classList.remove('selected');
-    selectedShip = null;
-
-    render();
-    updatePlacementStatus();
-  } catch {
-    if (prevPlacement) shipPlacements.set(selectedShip, prevPlacement);
-    rebuildPlayerBoard();
-    render();
-    updateStatus('Invalid placement — out of bounds or overlapping.');
-  }
-});
-
 // ── Randomize ─────────────────────────────────────────────────────────────────
 randomizeBtn.addEventListener('click', () => {
-  game.randomizePlayerShips();
+  game.randomizePlayerShips(currentSetupPlayer);
   shipPlacements.clear();
   allShipEls.forEach(s => {
     s.classList.remove('selected', 'vertical', 'dragging');
@@ -299,7 +387,8 @@ randomizeBtn.addEventListener('click', () => {
 
 // ── Reset Ships ───────────────────────────────────────────────────────────────
 resetBtn.addEventListener('click', () => {
-  game.player.gameboard.resetBoard();
+  const player = currentSetupPlayer === 1 ? game.player1 : game.player2;
+  player.gameboard.resetBoard();
   shipPlacements.clear();
   selectedShip = null;
   direction = 'horizontal';
@@ -308,7 +397,8 @@ resetBtn.addEventListener('click', () => {
   );
   clearBoardSelection();
   render();
-  updateStatus('Ships reset. Drag your ships onto the board.');
+  const playerName = gameMode === 'vsPlayer' ? `Player ${currentSetupPlayer}` : '';
+  updateStatus(`${playerName} Ships reset. Drag your ships onto the board.`);
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
@@ -317,6 +407,25 @@ startBtn.addEventListener('click', () => {
     updateStatus(`Place all ${totalShips} ships first! (${shipPlacements.size}/${totalShips})`);
     return;
   }
+  
+  if (gameMode === 'vsPlayer' && currentSetupPlayer === 1) {
+    // Player 1 done, now Player 2's turn
+    currentSetupPlayer = 2;
+    shipPlacements.clear();
+    allShipEls.forEach(s =>
+      s.classList.remove('placed', 'selected', 'vertical', 'dragging')
+    );
+    selectedShip = null;
+    direction = 'horizontal';
+    
+    showPassDevice('Player 2', () => {
+      render();
+      updateStatus('Player 2: Drag ships onto your board, or click "Randomize Ships".');
+    });
+    return;
+  }
+  
+  // All players ready - start the game
   gameStarted = true;
   startBtn.disabled     = true;
   randomizeBtn.disabled = true;
@@ -324,38 +433,83 @@ startBtn.addEventListener('click', () => {
   rotateBtn.disabled    = true;
   newGameBtn.disabled   = false;
   clearBoardSelection();
-  updateStatus('Game started! Click an enemy cell to attack.');
+  
+  if (gameMode === 'vsPlayer') {
+    showPassDevice('Player 1', () => {
+      render();
+      updateStatus('Player 1: Click an enemy cell to attack.');
+    });
+  } else {
+    render();
+    updateStatus('Game started! Click an enemy cell to attack.');
+  }
 });
 
 // ── Attack ────────────────────────────────────────────────────────────────────
-computerBoardDiv.addEventListener('click', (e) => {
+function handleAttack(boardDiv, e) {
   if (!gameStarted) return;
   const cell = e.target.closest('.cell');
   if (!cell) return;
 
+  const currentPlayer = game.getCurrentPlayer();
+  const opponent = game.getOpponent();
+  
+  // In 2-player mode, ensure they're clicking the opponent's board
+  if (gameMode === 'vsPlayer') {
+    if (currentPlayer === game.player1 && boardDiv === playerBoardDiv) {
+      updateStatus('Click on Player 2\'s board to attack!');
+      return;
+    }
+    if (currentPlayer === game.player2 && boardDiv === computerBoardDiv) {
+      updateStatus('Click on Player 1\'s board to attack!');
+      return;
+    }
+  }
+
   try {
     game.playTurn([Number(cell.dataset.x), Number(cell.dataset.y)]);
     render();
-    if (game.isGameOver()) { updateStatus('🎉 You win! Click "New Game" to play again.'); return; }
+    
+    if (game.isGameOver()) {
+      const winner = game.getWinner();
+      updateStatus(`🎉 ${winner.name} wins! Click "New Game" to play again.`);
+      return;
+    }
 
-    updateStatus("Computer's turn...");
-    computerBoardDiv.style.pointerEvents = 'none';
-    setTimeout(() => {
-      game.playTurn();
-      render();
-      computerBoardDiv.style.pointerEvents = '';
-      updateStatus(game.isGameOver()
-        ? '💻 Computer wins! Click "New Game" to play again.'
-        : 'Your turn! Click an enemy cell.');
-    }, 600);
+    if (gameMode === 'vsComputer') {
+      updateStatus("Computer's turn...");
+      computerBoardDiv.style.pointerEvents = 'none';
+      setTimeout(() => {
+        game.playTurn();
+        render();
+        computerBoardDiv.style.pointerEvents = '';
+        updateStatus(game.isGameOver()
+          ? '💻 Computer wins! Click "New Game" to play again.'
+          : 'Your turn! Click an enemy cell.');
+      }, 600);
+    } else {
+      // 2-player mode - show pass device screen
+      const nextPlayer = game.getCurrentPlayer();
+      showPassDevice(nextPlayer.name, () => {
+        render();
+        updateStatus(`${nextPlayer.name}: Click an enemy cell to attack.`);
+      });
+    }
   } catch {
     updateStatus('Already attacked here — pick another cell.');
   }
-});
+}
+
+playerBoardDiv.addEventListener('click', (e) => handleAttack(playerBoardDiv, e));
+computerBoardDiv.addEventListener('click', (e) => handleAttack(computerBoardDiv, e));
 
 // ── New Game ──────────────────────────────────────────────────────────────────
 newGameBtn.addEventListener('click', () => location.reload());
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-render();
-updateStatus('Drag ships onto your board, or click "Randomize Ships".');
+// Start with mode selection visible
+modeSelection.style.display = 'flex';
+document.querySelector('.controls').style.display = 'none';
+document.querySelector('#shipyard').style.display = 'none';
+document.querySelector('.game-container').style.display = 'none';
+document.querySelector('#status').style.display = 'none';

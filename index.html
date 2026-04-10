@@ -8,6 +8,22 @@
 <body>
   <h1>Battleship</h1>
 
+  <!-- Mode Selection Screen -->
+  <div id="mode-selection" class="mode-selection">
+    <h2>Choose Game Mode</h2>
+    <button id="vs-computer-btn" class="mode-btn">🤖 vs Computer</button>
+    <button id="vs-player-btn" class="mode-btn">👥 vs Player (2P)</button>
+  </div>
+
+  <!-- Pass Device Overlay -->
+  <div id="pass-device-overlay" class="pass-device-overlay">
+    <div class="pass-device-content">
+      <h2 id="pass-device-text">Pass device to Player 2</h2>
+      <p>Make sure the other player can't see the screen!</p>
+      <button id="continue-btn" class="continue-btn">I'm Ready</button>
+    </div>
+  </div>
+
   <div class="controls">
     <button id="new-game-btn" disabled>New Game</button>
     <button id="start-btn">Start Game</button>

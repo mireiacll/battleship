@@ -1,11 +1,14 @@
 import Player from './player.js';
 import Ship from './ship.js';
 
-export default function createGame() {
-  const player = new Player(false);
-  const computer = new Player(true);
+export default function createGame(mode = 'vsComputer') {
+  const player1 = new Player(false, 'Player 1');
+  const player2 = mode === 'vsComputer' 
+    ? new Player(true, 'Computer')
+    : new Player(false, 'Player 2');
 
-  let currentPlayer = player;
+  let currentPlayer = player1;
+  const gameMode = mode;
 
   function placeShipsRandomly(gameboard) {
     const shipLengths = [5, 4, 3, 3, 2];
@@ -29,10 +32,13 @@ export default function createGame() {
     });
   }
 
-  // Only the computer gets ships at initialization
-  placeShipsRandomly(computer.gameboard);
+  // Only the computer gets ships at initialization in vs Computer mode
+  if (mode === 'vsComputer') {
+    placeShipsRandomly(player2.gameboard);
+  }
 
-  function randomizePlayerShips() {
+  function randomizePlayerShips(playerNum = 1) {
+    const player = playerNum === 1 ? player1 : player2;
     player.gameboard.resetBoard();
     placeShipsRandomly(player.gameboard);
   }
@@ -41,19 +47,24 @@ export default function createGame() {
     return currentPlayer;
   }
 
+  function getOpponent() {
+    return currentPlayer === player1 ? player2 : player1;
+  }
+
   function switchTurn() {
-    currentPlayer = currentPlayer === player ? computer : player;
+    currentPlayer = currentPlayer === player1 ? player2 : player1;
   }
 
   function playTurn(coordinates) {
     if (isGameOver()) return 'Game Over';
 
+    const opponent = getOpponent();
     let result;
 
-    if (currentPlayer === player) {
-      result = player.attack(computer.gameboard, coordinates);
+    if (currentPlayer.isComputer) {
+      result = currentPlayer.randomAttack(opponent.gameboard);
     } else {
-      result = computer.randomAttack(player.gameboard);
+      result = currentPlayer.attack(opponent.gameboard, coordinates);
     }
 
     if (!isGameOver()) {
@@ -65,23 +76,33 @@ export default function createGame() {
 
   function isGameOver() {
     return (
-      player.gameboard.allShipsSunk() ||
-      computer.gameboard.allShipsSunk()
+      player1.gameboard.allShipsSunk() ||
+      player2.gameboard.allShipsSunk()
     );
   }
 
-  function placePlayerShip(length, coordinates, direction) {
+  function getWinner() {
+    if (player1.gameboard.allShipsSunk()) return player2;
+    if (player2.gameboard.allShipsSunk()) return player1;
+    return null;
+  }
+
+  function placePlayerShip(length, coordinates, direction, playerNum = 1) {
+    const player = playerNum === 1 ? player1 : player2;
     const ship = new Ship(length);
     player.gameboard.placeShip(ship, coordinates, direction);
   }
 
   return {
-    player,
-    computer,
+    player1,
+    player2,
     playTurn,
     getCurrentPlayer,
+    getOpponent,
     isGameOver,
+    getWinner,
     randomizePlayerShips,
     placePlayerShip,
+    gameMode,
   };
 }
