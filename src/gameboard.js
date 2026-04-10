@@ -3,11 +3,12 @@ export default class Gameboard {
     this.size = 10;
     this.ships = [];
     this.missedAttacks = [];
-    this.hits = []; // Track successful hit coordinates
+    this.hits = [];
+    this.attackedCoordinates = new Set();
+
     this.board = Array.from({ length: this.size }, () =>
       Array(this.size).fill(null)
     );
-    this.attackedCoordinates = new Set();
   }
 
   placeShip(ship, start, direction = 'horizontal') {
@@ -58,7 +59,7 @@ export default class Gameboard {
 
     if (target) {
       target.hit();
-      this.hits.push([x, y]); // Record exact hit location
+      this.hits.push([x, y]);
       return 'hit';
     } else {
       this.missedAttacks.push([x, y]);
@@ -71,12 +72,13 @@ export default class Gameboard {
   }
 
   resetBoard() {
-  this.ships = [];
-  this.missedAttacks = [];
-  this.hits = [];
-  this.attackedCoordinates.clear();
-  this.board = Array.from({ length: this.size }, () =>
-    Array(this.size).fill(null)
-  );
-}
+    this.ships = [];
+    this.missedAttacks = [];
+    this.hits = [];
+    this.attackedCoordinates.clear();
+
+    this.board = Array.from({ length: this.size }, () =>
+      Array(this.size).fill(null)
+    );
+  }
 }

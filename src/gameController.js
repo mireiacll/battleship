@@ -22,27 +22,15 @@ export default function createGame() {
         try {
           gameboard.placeShip(ship, [x, y], direction);
           placed = true;
-        } catch (error) {
-          // Invalid placement (overlap or out of bounds); retry
+        } catch {
+          // Retry until placement is valid
         }
       }
     });
   }
 
-  // Predetermined ship placements
-  function placeShips() {
-    // Player ships
-    player.gameboard.placeShip(new Ship(5), [0, 0], 'horizontal');
-    player.gameboard.placeShip(new Ship(4), [2, 0], 'horizontal');
-    player.gameboard.placeShip(new Ship(3), [4, 0], 'horizontal');
-    player.gameboard.placeShip(new Ship(3), [6, 0], 'horizontal');
-    player.gameboard.placeShip(new Ship(2), [8, 0], 'horizontal');
-
-    // Computer ships
-    placeShipsRandomly(computer.gameboard);
-  }
-
-  placeShips();
+  // Only the computer gets ships at initialization
+  placeShipsRandomly(computer.gameboard);
 
   function randomizePlayerShips() {
     player.gameboard.resetBoard();
@@ -82,6 +70,11 @@ export default function createGame() {
     );
   }
 
+  function placePlayerShip(length, coordinates, direction) {
+    const ship = new Ship(length);
+    player.gameboard.placeShip(ship, coordinates, direction);
+  }
+
   return {
     player,
     computer,
@@ -89,5 +82,6 @@ export default function createGame() {
     getCurrentPlayer,
     isGameOver,
     randomizePlayerShips,
+    placePlayerShip,
   };
 }

@@ -4,14 +4,32 @@ body {
   background-color: #f4f6f8;
 }
 
-h1 {
-  margin-top: 20px;
-}
+h1 { margin-top: 20px; }
 
+.controls { margin: 15px 0; }
+
+button {
+  margin: 5px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  background-color: #007bff;
+  color: white;
+  transition: background-color 0.15s;
+}
+button:hover    { background-color: #0056b3; }
+button:disabled { background-color: #aaa; cursor: not-allowed; }
+
+#reset-btn       { background-color: #e67e22; }
+#reset-btn:hover { background-color: #c0392b; }
+
+/* ── Boards ── */
 .game-container {
   display: flex;
   justify-content: center;
-  gap: 50px;
+  gap: 60px;
   margin-top: 20px;
 }
 
@@ -29,47 +47,81 @@ h1 {
   margin-top: 10px;
 }
 
+/* ── Cells ── */
 .cell {
   width: 35px;
   height: 35px;
   background-color: #cfe2ff;
-  border: 1px solid #333;
+  border: 1px solid #6699cc;
   cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color 0.1s;
 }
 
-.cell.ship {
+/* Cell containing a placed ship */
+.cell.has-ship {
+  background-color: #5a6370;
+  border-color: #3d4349;
+  cursor: grab;
+}
+.cell.has-ship:hover {
   background-color: #6c757d;
+  border-color: #adb5bd;
 }
 
-.cell.hit {
-  background-color: #dc3545;
+/* Currently selected ship cells (outlined in blue) */
+.cell.board-selected {
+  background-color: #4a7ab5 !important;
+  border-color: #1a4a85 !important;
+  cursor: grab;
 }
 
-.cell.miss {
-  background-color: #ffffff;
-}
+.cell.hit  { background-color: #dc3545; border-color: #a71d2a; cursor: default; }
+.cell.miss { background-color: #e9ecef; border-color: #adb5bd; cursor: default; }
 
-#computer-board .cell:hover {
-  background-color: #90caf9;
-}
+/* Drag-over preview */
+.cell.preview-valid   { background-color: #5cb85c !important; border-color: #3d8b3d !important; }
+.cell.preview-invalid { background-color: #d9534f !important; border-color: #a02020 !important; }
 
 #status {
   margin-top: 20px;
   font-weight: bold;
+  font-size: 15px;
 }
 
-button {
-  margin: 10px;
-  padding: 8px 14px;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  border-radius: 6px;
-  background-color: #007bff;
-  color: white;
-  transition: background-color 0.2s ease;
+/* ── Shipyard ── */
+.shipyard {
+  margin: 20px auto;
+  min-height: 70px;
+  text-align: center;
+}
+.shipyard h3 { margin-bottom: 10px; }
+
+.ship {
+  display: inline-block;
+  background-color: #5a6370;
+  margin: 8px;
+  height: 35px;
+  border-radius: 4px;
+  cursor: grab;
+  border: 2px solid #3d4349;
+  box-sizing: border-box;
+  vertical-align: middle;
+  transition: opacity 0.15s;
 }
 
-button:hover {
-  background-color: #0056b3;
-}
+/* Width = length×35 + (length−1)×2 to match grid exactly */
+.ship[data-length="5"] { width: 183px; }
+.ship[data-length="4"] { width: 146px; }
+.ship[data-length="3"] { width: 109px; }
+.ship[data-length="2"] { width: 72px;  }
+
+.ship.vertical { width: 35px !important; }
+.ship.vertical[data-length="5"] { height: 183px; }
+.ship.vertical[data-length="4"] { height: 146px; }
+.ship.vertical[data-length="3"] { height: 109px; }
+.ship.vertical[data-length="2"] { height: 72px;  }
+
+.ship.dragging { opacity: 0.35; }
+.ship.selected { outline: 3px solid #ff4444; outline-offset: 2px; }
+.ship.placed   { display: none; }

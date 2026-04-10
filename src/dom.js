@@ -1,33 +1,23 @@
-export function renderBoard(board, container, showShips = false) {
+export function renderBoard(gameboard, container, showShips = false) {
   container.innerHTML = '';
 
-  board.board.forEach((row, x) => {
+  gameboard.board.forEach((row, x) => {
     row.forEach((cell, y) => {
       const div = document.createElement('div');
       div.classList.add('cell');
       div.dataset.x = x;
       div.dataset.y = y;
 
-      // Show ships on the player's board
-      if (cell && showShips) {
-        div.classList.add('ship');
+      // Use 'has-ship' to avoid collision with shipyard .ship CSS class
+      if (cell !== null && showShips) {
+        div.classList.add('has-ship');
       }
 
-      // Check if this coordinate is a hit
-      const isHit = board.hits.some(
-        ([hx, hy]) => hx === x && hy === y
-      );
+      const isHit  = gameboard.hits.some(([hx, hy]) => hx === x && hy === y);
+      const isMiss = gameboard.missedAttacks.some(([mx, my]) => mx === x && my === y);
 
-      // Check if this coordinate is a miss
-      const isMiss = board.missedAttacks.some(
-        ([mx, my]) => mx === x && my === y
-      );
-
-      if (isHit) {
-        div.classList.add('hit');
-      } else if (isMiss) {
-        div.classList.add('miss');
-      }
+      if (isHit)       div.classList.add('hit');
+      else if (isMiss) div.classList.add('miss');
 
       container.appendChild(div);
     });
@@ -36,5 +26,5 @@ export function renderBoard(board, container, showShips = false) {
 
 export function updateStatus(message) {
   const status = document.getElementById('status');
-  status.textContent = message;
+  if (status) status.textContent = message;
 }

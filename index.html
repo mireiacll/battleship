@@ -1,28 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Battleship</title>
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="./src/index.js" defer></script>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <h1>Battleship</h1>
-  <button id="restart-btn">New Game</button>
+
+  <div class="controls">
+    <button id="new-game-btn" disabled>New Game</button>
+    <button id="start-btn">Start Game</button>
+    <button id="randomize-btn">Randomize Ships</button>
+    <button id="reset-btn">Reset Ships</button>
+    <button id="rotate-btn">Rotate Ship</button>
+  </div>
+
+  <div id="shipyard" class="shipyard">
+    <h3>Drag Your Ships</h3>
+    <div class="ship" draggable="true" data-length="5"></div>
+    <div class="ship" draggable="true" data-length="4"></div>
+    <div class="ship" draggable="true" data-length="3"></div>
+    <div class="ship" draggable="true" data-length="3"></div>
+    <div class="ship" draggable="true" data-length="2"></div>
+  </div>
 
   <div class="game-container">
     <div class="board-container">
       <h2>Player Board</h2>
-      <button id="randomize-btn">Randomize Ships</button>
       <div id="player-board" class="board"></div>
     </div>
-
     <div class="board-container">
       <h2>Computer Board</h2>
       <div id="computer-board" class="board"></div>
     </div>
   </div>
 
-  <p id="status">Your turn! Attack the enemy board.</p>
+  <p id="status"></p>
+
+  <script type="module" src="./src/index.js"></script>
 </body>
 </html>
